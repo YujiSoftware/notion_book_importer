@@ -109,29 +109,43 @@ public class KindleService {
                 .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
         Map<UUID, PageObjectResponse> pages = new HashMap<>();
 
+        String cursor = null;
         try (var client = HttpClient.newHttpClient()) {
-            var req = HttpRequest.newBuilder()
-                    .uri(URI.create("https://api.notion.com/v1/databases/" + databaseId + "/query"))
-                    .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("Notion-Version", "2022-06-28")
-                    .POST(HttpRequest.BodyPublishers.ofString("{\"filter\": { \"property\": \"ストア\", \"select\": { \"equals\": \"Kindle\" }}}"))
-                    .build();
+            do {
+                // TODO: オブジェクト化
+                String json;
+                if (cursor == null) {
+                    json = "{\"filter\": { \"property\": \"ストア\", \"select\": { \"equals\": \"Kindle\" }}}";
+                } else {
+                    json = "{\"start_cursor\": \"" + cursor + "\"}";
+                }
+                logger.debug(json);
 
-            var res = client.send(req, HttpResponse.BodyHandlers.ofString());
-            if (res.statusCode() != HttpURLConnection.HTTP_OK) {
-                throw new IOException(res.body());
-            }
+                var req = HttpRequest.newBuilder()
+                        .uri(URI.create("https://api.notion.com/v1/databases/" + databaseId + "/query"))
+                        .header("Content-Type", "application/json")
+                        .header("Authorization", "Bearer " + apiKey)
+                        .header("Notion-Version", "2022-06-28")
+                        .POST(HttpRequest.BodyPublishers.ofString(json))
+                        .build();
 
-            QueryDatabaseResponse response = mapper.readValue(res.body(), QueryDatabaseResponse.class);
-            for (PageObjectResponse result : response.results()) {
-                Map<?, ?> uuid = (Map<?, ?>) result.properties().get("UUID");
-                List<?> richText = (List<?>) uuid.get("rich_text");
-                Map<?, ?> block = (Map<?, ?>) richText.getFirst();
-                String plainText = (String) block.get("plain_text");
+                var res = client.send(req, HttpResponse.BodyHandlers.ofString());
+                if (res.statusCode() != HttpURLConnection.HTTP_OK) {
+                    throw new IOException(res.body());
+                }
 
-                pages.put(UUID.fromString(plainText), result);
-            }
+                QueryDatabaseResponse response = mapper.readValue(res.body(), QueryDatabaseResponse.class);
+                for (PageObjectResponse result : response.results()) {
+                    Map<?, ?> uuid = (Map<?, ?>) result.properties().get("UUID");
+                    List<?> richText = (List<?>) uuid.get("rich_text");
+                    Map<?, ?> block = (Map<?, ?>) richText.getFirst();
+                    String plainText = (String) block.get("plain_text");
+
+                    pages.put(UUID.fromString(plainText), result);
+                }
+
+                cursor = response.hasMore() ? response.nextCursor() : null;
+            } while (cursor != null);
         }
 
         return pages;
