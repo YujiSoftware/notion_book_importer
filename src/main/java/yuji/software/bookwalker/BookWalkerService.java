@@ -1,4 +1,4 @@
-package yuji.software.kindle;
+package yuji.software.bookwalker;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,18 +19,15 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 @Service
-public class KindleService implements BookshelfService {
-    private static final Logger logger = LoggerFactory.getLogger(KindleService.class);
+public class BookWalkerService implements BookshelfService {
+    private static final Logger logger = LoggerFactory.getLogger(BookWalkerService.class);
 
-    private static final String STORE = "Kindle";
+    private static final String STORE = "BOOK☆WALKER";
 
     @Value("${NOTION_API_KEY}")
     private String apiKey;
@@ -41,25 +38,26 @@ public class KindleService implements BookshelfService {
     @Autowired
     private Notion notion;
 
+    @Override
     public void upload(MultipartFile file) throws IOException, InterruptedException {
-        List<Kindle> list = Bookshelf.read(file, new TypeReference<>() {
+        List<BookWalker> list = Bookshelf.read(file, new TypeReference<>() {
         });
 
         ObjectMapper mapper = new ObjectMapper();
         Map<UUID, PageObjectResponse> pages = notion.getPages(STORE);
 
         try (var client = HttpClient.newHttpClient()) {
-            for (Kindle kindle : list) {
-                PageObjectResponse page = pages.get(kindle.uuid());
+            for (BookWalker bookWalker : list) {
+                PageObjectResponse page = pages.get(bookWalker.uuid());
                 if (page != null) {
                     Map<?, ?> status = (Map<?, ?>) page.properties().get("ステータス");
                     Map<?, ?> select = (Map<?, ?>) status.get("select");
                     String name = (String) select.get("name");
-                    if (ReadStatus.fromText(name) == kindle.readStatus()) {
+                    if (ReadStatus.valueOf(name) == bookWalker.status()) {
                         continue;
                     }
 
-                    var data = Notion.makeUpdateJson(kindle.readStatus().getText());
+                    var data = Notion.makeUpdateJson(bookWalker.status().name());
                     String json = mapper.writeValueAsString(data);
                     logger.debug(json);
 
@@ -78,13 +76,13 @@ public class KindleService implements BookshelfService {
                 } else {
                     var data = Notion.makeCreateJson(
                             databaseId,
-                            kindle.uuid(),
-                            kindle.title(),
-                            kindle.authors(),
-                            ZonedDateTime.ofInstant(Instant.ofEpochMilli(kindle.acquiredTime()), ZoneId.of("Asia/Tokyo")),
-                            kindle.readStatus().getText(),
+                            bookWalker.uuid(),
+                            bookWalker.title(),
+                            String.join(",", bookWalker.authors()),
+                            bookWalker.buyTime(),
+                            bookWalker.status().name(),
                             STORE,
-                            "https://read.amazon.co.jp/?asin=" + kindle.asin()
+                            bookWalker.url().toString()
                     );
 
                     String json = mapper.writeValueAsString(data);

@@ -1,7 +1,7 @@
 package yuji.software.kindle;
 
 public enum ReadStatus {
-    READ("読了"),
+    READ("既読"),
     UNKNOWN("未読");
 
     private final String text;

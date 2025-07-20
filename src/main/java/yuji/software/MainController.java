@@ -5,20 +5,20 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
-import yuji.software.kindle.Kindle;
+import yuji.software.bookwalker.BookWalkerService;
 import yuji.software.kindle.KindleService;
 
-import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.List;
 
 @Controller
 public class MainController {
-    private final KindleService service;
+    private final KindleService kindleService;
 
-    public MainController(KindleService service) {
-        this.service = service;
+    private final BookWalkerService bookWalkerService;
+
+    public MainController(KindleService service, BookWalkerService bookWalkerService) {
+        this.kindleService = service;
+        this.bookWalkerService = bookWalkerService;
     }
 
     @GetMapping("/")
@@ -30,12 +30,17 @@ public class MainController {
     public String upload(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "type") String type) throws IOException, InterruptedException {
-        List<Kindle> list;
-        try (InputStream stream = new BufferedInputStream(file.getInputStream())) {
-            list = service.read(stream);
-        }
-        service.upload(list);
+        BookshelfService service = getService(type);
+        service.upload(file);
 
         return "index";
+    }
+
+    private BookshelfService getService(String type) {
+        return switch (type) {
+            case "kindle" -> kindleService;
+            case "book-walker" -> bookWalkerService;
+            default -> throw new RuntimeException("Unknown type: " + type);
+        };
     }
 }
