@@ -8,6 +8,7 @@ import org.springframework.web.multipart.MultipartFile;
 import yuji.software.kindle.Kindle;
 import yuji.software.kindle.KindleService;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -30,7 +31,7 @@ public class MainController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "type") String type) throws IOException, InterruptedException {
         List<Kindle> list;
-        try (InputStream stream = file.getInputStream()) {
+        try (InputStream stream = new BufferedInputStream(file.getInputStream())) {
             list = service.read(stream);
         }
         service.upload(list);
