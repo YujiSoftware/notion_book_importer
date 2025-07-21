@@ -1,10 +1,6 @@
 package yuji.software.kindle;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -14,11 +10,6 @@ import yuji.software.Notion;
 import yuji.software.notion.PageObjectResponse;
 
 import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -28,8 +19,6 @@ import java.util.UUID;
 
 @Service
 public class KindleService implements BookshelfService {
-    private static final Logger logger = LoggerFactory.getLogger(KindleService.class);
-
     private static final String STORE = "Kindle";
 
     @Value("${NOTION_API_KEY}")
@@ -38,69 +27,37 @@ public class KindleService implements BookshelfService {
     @Value("${NOTION_DATABASE_ID}")
     private String databaseId;
 
-    @Autowired
-    private Notion notion;
-
     public void upload(MultipartFile file) throws IOException, InterruptedException {
         List<Kindle> list = Bookshelf.read(file, new TypeReference<>() {
         });
 
-        ObjectMapper mapper = new ObjectMapper();
-        Map<UUID, PageObjectResponse> pages = notion.getPages(STORE);
-
-        try (var client = HttpClient.newHttpClient()) {
+        try (Notion notion = new Notion(apiKey, databaseId)) {
+            Map<UUID, PageObjectResponse> pages = notion.getPages(STORE);
             for (Kindle kindle : list) {
                 PageObjectResponse page = pages.get(kindle.uuid());
                 if (page != null) {
                     Map<?, ?> status = (Map<?, ?>) page.properties().get("ステータス");
                     Map<?, ?> select = (Map<?, ?>) status.get("select");
-                    String name = (String) select.get("name");
-                    if (ReadStatus.fromText(name) == kindle.readStatus()) {
-                        continue;
+                    if (select != null) {
+                        String name = (String) select.get("name");
+                        if (ReadStatus.fromText(name) == kindle.readStatus()) {
+                            continue;
+                        }
                     }
 
-                    var data = Notion.makeUpdateJson(kindle.readStatus().getText());
-                    String json = mapper.writeValueAsString(data);
-                    logger.debug(json);
-
-                    var req = HttpRequest.newBuilder()
-                            .uri(URI.create("https://api.notion.com/v1/pages/" + page.id()))
-                            .header("Content-Type", "application/json")
-                            .header("Authorization", "Bearer " + apiKey)
-                            .header("Notion-Version", "2022-06-28")
-                            .method("PATCH", HttpRequest.BodyPublishers.ofString(json))
-                            .build();
-
-                    var res = client.send(req, HttpResponse.BodyHandlers.ofString());
-                    if (res.statusCode() != HttpURLConnection.HTTP_OK) {
-                        throw new IOException(res.body());
-                    }
+                    notion.builder()
+                            .status(kindle.readStatus().getText())
+                            .update(page.id());
                 } else {
-                    var data = Notion.makeCreateJson(
-                            databaseId,
-                            kindle.uuid(),
-                            kindle.title(),
-                            kindle.authors(),
-                            ZonedDateTime.ofInstant(Instant.ofEpochMilli(kindle.acquiredTime()), ZoneId.of("Asia/Tokyo")),
-                            kindle.readStatus().getText(),
-                            STORE,
-                            "https://read.amazon.co.jp/?asin=" + kindle.asin()
-                    );
-
-                    String json = mapper.writeValueAsString(data);
-                    logger.debug(json);
-
-                    var req = HttpRequest.newBuilder()
-                            .uri(URI.create("https://api.notion.com/v1/pages"))
-                            .header("Content-Type", "application/json")
-                            .header("Authorization", "Bearer " + apiKey)
-                            .header("Notion-Version", "2022-06-28")
-                            .POST(HttpRequest.BodyPublishers.ofString(json))
-                            .build();
-                    var res = client.send(req, HttpResponse.BodyHandlers.ofString());
-                    if (res.statusCode() != HttpURLConnection.HTTP_OK) {
-                        throw new IOException(res.body());
-                    }
+                    notion.builder()
+                            .uuid(kindle.uuid())
+                            .title(kindle.title())
+                            .author(kindle.authors())
+                            .buyTime(ZonedDateTime.ofInstant(Instant.ofEpochMilli(kindle.acquiredTime()), ZoneId.of("Asia/Tokyo")))
+                            .status(kindle.readStatus().getText())
+                            .store(STORE)
+                            .url("https://read.amazon.co.jp/?asin=" + kindle.asin())
+                            .create();
                 }
             }
         }
