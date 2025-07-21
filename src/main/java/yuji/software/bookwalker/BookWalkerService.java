@@ -1,6 +1,5 @@
 package yuji.software.bookwalker;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -10,7 +9,6 @@ import yuji.software.Notion;
 import yuji.software.notion.PageObjectResponse;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -26,35 +24,34 @@ public class BookWalkerService implements BookshelfService {
 
     @Override
     public void upload(MultipartFile file) throws IOException, InterruptedException {
-        List<BookWalker> list = Bookshelf.read(file, new TypeReference<>() {
-        });
+        BookWalker bookWalker = Bookshelf.read(file, BookWalker.class);
 
         try (Notion notion = new Notion(apiKey, databaseId)) {
             Map<UUID, PageObjectResponse> pages = notion.getPages(STORE);
-            for (BookWalker bookWalker : list) {
-                PageObjectResponse page = pages.get(bookWalker.uuid());
+            for (BookWalkerItem item : bookWalker.items()) {
+                PageObjectResponse page = pages.get(item.uuid());
                 if (page != null) {
                     Map<?, ?> status = (Map<?, ?>) page.properties().get("ステータス");
                     Map<?, ?> select = (Map<?, ?>) status.get("select");
                     if (select != null) {
                         String name = (String) select.get("name");
-                        if (ReadStatus.valueOf(name) == bookWalker.status()) {
+                        if (ReadStatus.valueOf(name) == item.status()) {
                             continue;
                         }
                     }
 
                     notion.builder()
-                            .status(bookWalker.status().name())
+                            .status(item.status().name())
                             .update(page.id());
                 } else {
                     notion.builder()
-                            .title(bookWalker.title())
-                            .uuid(bookWalker.uuid())
-                            .author(String.join(",", bookWalker.authors()))
-                            .buyTime(bookWalker.buyTime())
-                            .status(bookWalker.status().name())
+                            .title(item.title())
+                            .uuid(item.uuid())
+                            .author(String.join(",", item.authors()))
+                            .buyTime(item.buyTime())
+                            .status(item.status().name())
                             .store(STORE)
-                            .url(bookWalker.url().toString())
+                            .url(item.url().toString())
                             .create();
                 }
             }

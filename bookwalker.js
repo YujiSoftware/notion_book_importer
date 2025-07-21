@@ -48,5 +48,9 @@
 
     page++;
   }
-  download(items);
+  download({
+    store: "BOOK_WALKER",
+    createdAt: new Date(),
+    items: items,
+  });
 })()

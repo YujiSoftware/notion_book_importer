@@ -1,6 +1,5 @@
 package yuji.software.kindle;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -13,7 +12,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -28,35 +26,34 @@ public class KindleService implements BookshelfService {
     private String databaseId;
 
     public void upload(MultipartFile file) throws IOException, InterruptedException {
-        List<Kindle> list = Bookshelf.read(file, new TypeReference<>() {
-        });
+        Kindle kindle = Bookshelf.read(file, Kindle.class);
 
         try (Notion notion = new Notion(apiKey, databaseId)) {
             Map<UUID, PageObjectResponse> pages = notion.getPages(STORE);
-            for (Kindle kindle : list) {
-                PageObjectResponse page = pages.get(kindle.uuid());
+            for (KindleItem item : kindle.items()) {
+                PageObjectResponse page = pages.get(item.uuid());
                 if (page != null) {
                     Map<?, ?> status = (Map<?, ?>) page.properties().get("ステータス");
                     Map<?, ?> select = (Map<?, ?>) status.get("select");
                     if (select != null) {
                         String name = (String) select.get("name");
-                        if (ReadStatus.fromText(name) == kindle.readStatus()) {
+                        if (ReadStatus.fromText(name) == item.readStatus()) {
                             continue;
                         }
                     }
 
                     notion.builder()
-                            .status(kindle.readStatus().getText())
+                            .status(item.readStatus().getText())
                             .update(page.id());
                 } else {
                     notion.builder()
-                            .uuid(kindle.uuid())
-                            .title(kindle.title())
-                            .author(kindle.authors())
-                            .buyTime(ZonedDateTime.ofInstant(Instant.ofEpochMilli(kindle.acquiredTime()), ZoneId.of("Asia/Tokyo")))
-                            .status(kindle.readStatus().getText())
+                            .uuid(item.uuid())
+                            .title(item.title())
+                            .author(item.authors())
+                            .buyTime(ZonedDateTime.ofInstant(Instant.ofEpochMilli(item.acquiredTime()), ZoneId.of("Asia/Tokyo")))
+                            .status(item.readStatus().getText())
                             .store(STORE)
-                            .url("https://read.amazon.co.jp/?asin=" + kindle.asin())
+                            .url("https://read.amazon.co.jp/?asin=" + item.asin())
                             .create();
                 }
             }
