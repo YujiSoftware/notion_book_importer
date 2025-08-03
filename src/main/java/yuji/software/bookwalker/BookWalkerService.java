@@ -7,6 +7,7 @@ import yuji.software.Bookshelf;
 import yuji.software.BookshelfService;
 import yuji.software.Notion;
 import yuji.software.notion.PageObjectResponse;
+import yuji.software.notion.PartialSelectResponse;
 
 import java.io.IOException;
 import java.util.Map;
@@ -31,11 +32,10 @@ public class BookWalkerService implements BookshelfService {
             for (BookWalkerItem item : bookWalker.items()) {
                 PageObjectResponse page = pages.get(item.uuid());
                 if (page != null) {
-                    Map<?, ?> status = (Map<?, ?>) page.properties().get("ステータス");
-                    Map<?, ?> select = (Map<?, ?>) status.get("select");
+                    PageObjectResponse.Property.Select status = (PageObjectResponse.Property.Select) page.properties().get("ステータス");
+                    PartialSelectResponse select = status.select();
                     if (select != null) {
-                        String name = (String) select.get("name");
-                        if (ReadStatus.valueOf(name) == item.status()) {
+                        if (ReadStatus.valueOf(select.name()) == item.status()) {
                             continue;
                         }
                     }

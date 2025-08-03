@@ -7,6 +7,7 @@ import yuji.software.Bookshelf;
 import yuji.software.BookshelfService;
 import yuji.software.Notion;
 import yuji.software.notion.PageObjectResponse;
+import yuji.software.notion.PartialSelectResponse;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -33,11 +34,10 @@ public class KindleService implements BookshelfService {
             for (KindleItem item : kindle.items()) {
                 PageObjectResponse page = pages.get(item.uuid());
                 if (page != null) {
-                    Map<?, ?> status = (Map<?, ?>) page.properties().get("ステータス");
-                    Map<?, ?> select = (Map<?, ?>) status.get("select");
+                    PageObjectResponse.Property.Select status = (PageObjectResponse.Property.Select) page.properties().get("ステータス");
+                    PartialSelectResponse select = status.select();
                     if (select != null) {
-                        String name = (String) select.get("name");
-                        if (ReadStatus.fromText(name) == item.readStatus()) {
+                        if (ReadStatus.fromText(select.name()) == item.readStatus()) {
                             continue;
                         }
                     }

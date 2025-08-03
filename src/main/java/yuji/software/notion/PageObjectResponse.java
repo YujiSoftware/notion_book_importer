@@ -1,7 +1,14 @@
 package yuji.software.notion;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.JsonTypeName;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 /*
@@ -171,5 +178,163 @@ export type PageObjectResponse = {
 }
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record PageObjectResponse(String id, Parent parent, Map<String, Object> properties) {
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+public record PageObjectResponse(
+        Parent parent,
+        Map<String, Property> properties,
+        PartialUserObjectResponse createdBy,
+        PartialUserObjectResponse lastEditedBy,
+        String object,
+        String id,
+        Instant createdTime,
+        Instant lastEditedTime,
+        boolean archived,
+        boolean inTrash,
+        String url,
+        String publicUrl
+) {
+    @JsonTypeInfo(
+            use = JsonTypeInfo.Id.NAME,
+            include = JsonTypeInfo.As.PROPERTY,
+            property = "type",
+            visible = true
+    )
+    @JsonSubTypes({
+            @JsonSubTypes.Type(Parent.DatabaseId.class),
+            @JsonSubTypes.Type(Parent.PageId.class),
+            @JsonSubTypes.Type(Parent.BlockId.class),
+            @JsonSubTypes.Type(Parent.Workspace.class),
+    })
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public sealed interface Parent {
+        String type();
+
+        @JsonTypeName("database_id")
+        record DatabaseId(String type, String databaseId) implements Parent {
+        }
+
+        @JsonTypeName("page_id")
+        record PageId(String type, String pageId) implements Parent {
+        }
+
+        @JsonTypeName("block_id")
+        record BlockId(String type, String blockId) implements Parent {
+        }
+
+        @JsonTypeName("workspace")
+        record Workspace(String type, String workspace) implements Parent {
+        }
+    }
+
+    @JsonTypeInfo(
+            use = JsonTypeInfo.Id.NAME,
+            include = JsonTypeInfo.As.PROPERTY,
+            property = "type",
+            visible = true
+    )
+    @JsonSubTypes({
+            @JsonSubTypes.Type(Property.Number.class),
+            @JsonSubTypes.Type(Property.Url.class),
+            @JsonSubTypes.Type(Property.Select.class),
+            @JsonSubTypes.Type(Property.MultiSelect.class),
+            @JsonSubTypes.Type(Property.Date.class),
+            @JsonSubTypes.Type(Property.Checkbox.class),
+            @JsonSubTypes.Type(Property.CreatedTime.class),
+            @JsonSubTypes.Type(Property.Formula.class),
+            @JsonSubTypes.Type(Property.Title.class),
+            @JsonSubTypes.Type(Property.RichText.class),
+            @JsonSubTypes.Type(Property.People.class),
+            @JsonSubTypes.Type(Property.Relation.class),
+            @JsonSubTypes.Type(Property.Rollup.class),
+    })
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public sealed interface Property {
+        String type();
+
+        String id();
+
+        @JsonTypeName("number")
+        record Number(String type, java.lang.Number number, String id) implements Property {
+        }
+
+        @JsonTypeName("url")
+        record Url(String type, String url, String id) implements Property {
+        }
+
+        @JsonTypeName("select")
+        record Select(String type, PartialSelectResponse select, String id) implements Property {
+        }
+
+        @JsonTypeName("multi_select")
+        record MultiSelect(String type, List<PartialSelectResponse> multiSelect, String id) implements Property {
+        }
+
+        @JsonTypeName("date")
+        record Date(String type, DateResponse date, String id) implements Property {
+        }
+
+        @JsonTypeName("checkbox")
+        record Checkbox(String type, boolean checkbox, String id) implements Property {
+        }
+
+        @JsonTypeName("created_time")
+        record CreatedTime(String type, Instant createdTime, String id) implements Property {
+        }
+
+        @JsonTypeName("formula")
+        record Formula(String type, FormulaPropertyResponse formula, String id) implements Property {
+        }
+
+        @JsonTypeName("title")
+        record Title(String type, List<RichTextItemResponse> title, String id) implements Property {
+        }
+
+        @JsonTypeName("rich_text")
+        record RichText(String type, List<RichTextItemResponse> richText, String id) implements Property {
+        }
+
+        @JsonTypeName("people")
+        record People(String type, List<UserObjectResponse> people, String id) implements Property {
+        }
+
+        @JsonTypeName("relation")
+        record Relation(String type, List<RelationResponse> relation, boolean hasMore,
+                        String id) implements Property {
+            record RelationResponse(String id) {
+            }
+        }
+
+        @JsonTypeName("rollup")
+        record Rollup(String type, RollupResponse rollup, String id) implements Property {
+            @JsonTypeInfo(
+                    use = JsonTypeInfo.Id.NAME,
+                    include = JsonTypeInfo.As.PROPERTY,
+                    property = "type",
+                    visible = true
+            )
+            @JsonSubTypes({
+                    @JsonSubTypes.Type(RollupResponse.Number.class),
+                    @JsonSubTypes.Type(RollupResponse.Date.class),
+                    @JsonSubTypes.Type(RollupResponse.Array.class),
+            })
+            @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+            public sealed interface RollupResponse {
+                String type();
+
+                RollupFunction function();
+
+                @JsonTypeName("number")
+                record Number(String type, java.lang.Number number, RollupFunction function) implements RollupResponse {
+                }
+
+                @JsonTypeName("date")
+                record Date(String type, DateResponse date, RollupFunction function) implements RollupResponse {
+                }
+
+                @JsonTypeName("array")
+                record Array(String type/* TODO */, RollupFunction function) implements RollupResponse {
+                }
+            }
+        }
+    }
 }

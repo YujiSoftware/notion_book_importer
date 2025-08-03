@@ -2,6 +2,7 @@ package yuji.software;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import yuji.software.notion.PageObjectResponse;
@@ -28,7 +29,7 @@ public class Notion implements Closeable {
 
     private final String databaseId;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     private final HttpClient client = HttpClient.newHttpClient();
 
@@ -186,6 +187,7 @@ public class Notion implements Closeable {
 
     public Map<UUID, PageObjectResponse> getPages(String store) throws IOException, InterruptedException {
         ObjectMapper mapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
                 .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
 
         Map<UUID, PageObjectResponse> pages = new HashMap<>();
@@ -214,10 +216,8 @@ public class Notion implements Closeable {
 
             QueryDatabaseResponse response = mapper.readValue(res.body(), QueryDatabaseResponse.class);
             for (PageObjectResponse result : response.results()) {
-                Map<?, ?> uuid = (Map<?, ?>) result.properties().get("UUID");
-                List<?> richText = (List<?>) uuid.get("rich_text");
-                Map<?, ?> block = (Map<?, ?>) richText.getFirst();
-                String plainText = (String) block.get("plain_text");
+                PageObjectResponse.Property.RichText uuid = (PageObjectResponse.Property.RichText) result.properties().get("UUID");
+                String plainText = uuid.richText().getFirst().plainText();
 
                 pages.put(UUID.fromString(plainText), result);
             }

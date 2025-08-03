@@ -1,6 +1,8 @@
 package yuji.software.notion;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
 import java.util.List;
 
@@ -20,6 +22,7 @@ export type QueryDatabaseResponse = {
 }
  */
 @JsonIgnoreProperties({"page_or_database"})
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record QueryDatabaseResponse(
         String type,
         String object,
