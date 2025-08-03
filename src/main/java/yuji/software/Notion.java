@@ -109,6 +109,17 @@ public class Notion implements Closeable {
             return this;
         }
 
+        public Builder category(String category) {
+            properties.put(
+                    "カテゴリー",
+                    Map.of(
+                            "select",
+                            Map.of("name", category)
+                    )
+            );
+            return this;
+        }
+
         public Builder buyTime(ZonedDateTime buyTime) {
             properties.put(
                     "購入日",

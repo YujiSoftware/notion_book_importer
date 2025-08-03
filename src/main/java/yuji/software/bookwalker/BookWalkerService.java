@@ -48,6 +48,7 @@ public class BookWalkerService implements BookshelfService {
                             .title(item.title())
                             .uuid(item.uuid())
                             .author(String.join(",", item.authors()))
+                            .category(item.category())
                             .buyTime(item.buyTime())
                             .status(item.status().name())
                             .store(STORE)
