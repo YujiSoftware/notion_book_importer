@@ -77,7 +77,7 @@ public class Notion implements Closeable {
             return this;
         }
 
-        public Builder uuid(UUID uuid) {
+        public Builder uuid(String prefix, UUID uuid) {
             properties.put(
                     "UUID",
                     Map.of(
@@ -85,7 +85,7 @@ public class Notion implements Closeable {
                             List.of(
                                     Map.of(
                                             "type", "text",
-                                            "text", Map.of("content", uuid.toString())
+                                            "text", Map.of("content", prefix + ":" + uuid.toString())
                                     )
                             )
                     )
@@ -196,7 +196,7 @@ public class Notion implements Closeable {
         }
     }
 
-    public Map<UUID, PageObjectResponse> getPages(String store) throws IOException, InterruptedException {
+    public Map<UUID, PageObjectResponse> getPages(String prefix) throws IOException, InterruptedException {
         ObjectMapper mapper = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
@@ -207,7 +207,7 @@ public class Notion implements Closeable {
             // TODO: オブジェクト化
             String json;
             if (cursor == null) {
-                json = "{\"filter\": { \"property\": \"ストア\", \"select\": { \"equals\": \"" + store + "\" }}}";
+                json = "{\"filter\": { \"property\": \"UUID\", \"rich_text\": { \"starts_with\": \"" + prefix + ":\" }}}";
             } else {
                 json = "{\"start_cursor\": \"" + cursor + "\"}";
             }
@@ -230,7 +230,7 @@ public class Notion implements Closeable {
                 PageObjectResponse.Property.RichText uuid = (PageObjectResponse.Property.RichText) result.properties().get("UUID");
                 String plainText = uuid.richText().getFirst().plainText();
 
-                pages.put(UUID.fromString(plainText), result);
+                pages.put(UUID.fromString(plainText.split(":")[1]), result);
             }
 
             cursor = response.hasMore() ? response.nextCursor() : null;

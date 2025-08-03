@@ -19,6 +19,7 @@ import java.util.UUID;
 @Service
 public class KindleService implements BookshelfService {
     private static final String STORE = "Kindle";
+    private static final String UUID_PREFIX = "KINDLE";
 
     @Value("${NOTION_API_KEY}")
     private String apiKey;
@@ -30,7 +31,7 @@ public class KindleService implements BookshelfService {
         Kindle kindle = Bookshelf.read(file, Kindle.class);
 
         try (Notion notion = new Notion(apiKey, databaseId)) {
-            Map<UUID, PageObjectResponse> pages = notion.getPages(STORE);
+            Map<UUID, PageObjectResponse> pages = notion.getPages(UUID_PREFIX);
             for (KindleItem item : kindle.items()) {
                 PageObjectResponse page = pages.get(item.uuid());
                 if (page != null) {
@@ -47,7 +48,7 @@ public class KindleService implements BookshelfService {
                             .update(page.id());
                 } else {
                     notion.builder()
-                            .uuid(item.uuid())
+                            .uuid(UUID_PREFIX, item.uuid())
                             .title(item.title())
                             .author(item.authors())
                             .buyTime(ZonedDateTime.ofInstant(Instant.ofEpochMilli(item.acquiredTime()), ZoneId.of("Asia/Tokyo")))

@@ -16,6 +16,7 @@ import java.util.UUID;
 @Service
 public class BookWalkerService implements BookshelfService {
     private static final String STORE = "BOOK☆WALKER";
+    private static final String UUID_PREFIX = "BOOKWALKER";
 
     @Value("${NOTION_API_KEY}")
     private String apiKey;
@@ -28,7 +29,7 @@ public class BookWalkerService implements BookshelfService {
         BookWalker bookWalker = Bookshelf.read(file, BookWalker.class);
 
         try (Notion notion = new Notion(apiKey, databaseId)) {
-            Map<UUID, PageObjectResponse> pages = notion.getPages(STORE);
+            Map<UUID, PageObjectResponse> pages = notion.getPages(UUID_PREFIX);
             for (BookWalkerItem item : bookWalker.items()) {
                 PageObjectResponse page = pages.get(item.uuid());
                 if (page != null) {
@@ -46,7 +47,7 @@ public class BookWalkerService implements BookshelfService {
                 } else {
                     notion.builder()
                             .title(item.title())
-                            .uuid(item.uuid())
+                            .uuid(UUID_PREFIX, item.uuid())
                             .author(String.join(",", item.authors()))
                             .category(item.category())
                             .buyTime(item.buyTime())
