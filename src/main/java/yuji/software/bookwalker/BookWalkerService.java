@@ -2,7 +2,6 @@ package yuji.software.bookwalker;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 import yuji.software.Bookshelf;
 import yuji.software.BookshelfService;
 import yuji.software.Notion;
@@ -10,6 +9,7 @@ import yuji.software.notion.PageObjectResponse;
 import yuji.software.notion.PartialSelectResponse;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
 
@@ -25,9 +25,12 @@ public class BookWalkerService implements BookshelfService {
     private String databaseId;
 
     @Override
-    public void upload(MultipartFile file) throws IOException, InterruptedException {
-        BookWalker bookWalker = Bookshelf.read(file, BookWalker.class);
+    public void process(Path path) throws IOException, InterruptedException {
+        BookWalker bookWalker = Bookshelf.read(path, BookWalker.class);
+        process(bookWalker);
+    }
 
+    public void process(BookWalker bookWalker) throws IOException, InterruptedException {
         try (Notion notion = new Notion(apiKey, databaseId)) {
             Map<UUID, PageObjectResponse> pages = notion.getPages(UUID_PREFIX);
             for (BookWalkerItem item : bookWalker.items()) {

@@ -1,9 +1,8 @@
 package yuji.software;
 
-import org.springframework.web.multipart.MultipartFile;
-
 import java.io.IOException;
+import java.nio.file.Path;
 
 public interface BookshelfService {
-    void upload(MultipartFile file) throws IOException, InterruptedException;
+    void process(Path path) throws IOException, InterruptedException;
 }

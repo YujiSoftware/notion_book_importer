@@ -2,7 +2,6 @@ package yuji.software.kindle;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 import yuji.software.Bookshelf;
 import yuji.software.BookshelfService;
 import yuji.software.Notion;
@@ -10,6 +9,7 @@ import yuji.software.notion.PageObjectResponse;
 import yuji.software.notion.PartialSelectResponse;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -27,9 +27,13 @@ public class KindleService implements BookshelfService {
     @Value("${NOTION_DATABASE_ID}")
     private String databaseId;
 
-    public void upload(MultipartFile file) throws IOException, InterruptedException {
-        Kindle kindle = Bookshelf.read(file, Kindle.class);
+    @Override
+    public void process(Path path) throws IOException, InterruptedException {
+        Kindle kindle = Bookshelf.read(path, Kindle.class);
+        process(kindle);
+    }
 
+    private void process(Kindle kindle) throws IOException, InterruptedException {
         try (Notion notion = new Notion(apiKey, databaseId)) {
             Map<UUID, PageObjectResponse> pages = notion.getPages(UUID_PREFIX);
             for (KindleItem item : kindle.items()) {
