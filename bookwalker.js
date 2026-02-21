@@ -53,4 +53,6 @@
     createdAt: new Date(),
     items: items,
   });
+
+  console.log(`Total: ${items.length}, ${Object.values(readStatus).map(s => `${s}: ${items.filter(i => i.status === s).length}`).join(", ")}`);
 })()
