@@ -20,7 +20,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 public class Notion implements Closeable {
     private static final Logger logger = LoggerFactory.getLogger(Notion.class);
@@ -77,15 +76,15 @@ public class Notion implements Closeable {
             return this;
         }
 
-        public Builder uuid(String prefix, UUID uuid) {
+        public Builder key(String prefix, String key) {
             properties.put(
-                    "UUID",
+                    "Key",
                     Map.of(
                             "rich_text",
                             List.of(
                                     Map.of(
                                             "type", "text",
-                                            "text", Map.of("content", prefix + ":" + uuid.toString())
+                                            "text", Map.of("content", prefix + ":" + key)
                                     )
                             )
                     )
@@ -179,7 +178,6 @@ public class Notion implements Closeable {
                             "properties", properties
                     )
             );
-            logger.debug(json);
 
             var req = HttpRequest.newBuilder()
                     .uri(URI.create("https://api.notion.com/v1/pages/" + pageId))
@@ -188,6 +186,7 @@ public class Notion implements Closeable {
                     .header("Notion-Version", "2022-06-28")
                     .method("PATCH", HttpRequest.BodyPublishers.ofString(json))
                     .build();
+            logger.debug("{}, PATCH: {}", req.uri().toString(), json);
 
             var res = client.send(req, HttpResponse.BodyHandlers.ofString());
             if (res.statusCode() != HttpURLConnection.HTTP_OK) {
@@ -196,18 +195,18 @@ public class Notion implements Closeable {
         }
     }
 
-    public Map<UUID, PageObjectResponse> getPages(String prefix) throws IOException, InterruptedException {
+    public Map<String, PageObjectResponse> getPages(String key) throws IOException, InterruptedException {
         ObjectMapper mapper = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
 
-        Map<UUID, PageObjectResponse> pages = new HashMap<>();
+        Map<String, PageObjectResponse> pages = new HashMap<>();
         String cursor = null;
         do {
             // TODO: オブジェクト化
             String json;
             if (cursor == null) {
-                json = "{\"filter\": { \"property\": \"UUID\", \"rich_text\": { \"starts_with\": \"" + prefix + ":\" }}}";
+                json = "{\"filter\": { \"property\": \"Key\", \"rich_text\": { \"starts_with\": \"" + key + ":\" }}}";
             } else {
                 json = "{\"start_cursor\": \"" + cursor + "\"}";
             }
@@ -219,6 +218,7 @@ public class Notion implements Closeable {
                     .header("Notion-Version", "2022-06-28")
                     .POST(HttpRequest.BodyPublishers.ofString(json))
                     .build();
+            logger.debug("{}, POST: {}", req.uri(), json);
 
             var res = client.send(req, HttpResponse.BodyHandlers.ofString());
             if (res.statusCode() != HttpURLConnection.HTTP_OK) {
@@ -227,10 +227,10 @@ public class Notion implements Closeable {
 
             QueryDatabaseResponse response = mapper.readValue(res.body(), QueryDatabaseResponse.class);
             for (PageObjectResponse result : response.results()) {
-                PageObjectResponse.Property.RichText uuid = (PageObjectResponse.Property.RichText) result.properties().get("UUID");
-                String plainText = uuid.richText().getFirst().plainText();
+                PageObjectResponse.Property.RichText prop = (PageObjectResponse.Property.RichText) result.properties().get("Key");
+                String plainText = prop.richText().getFirst().plainText();
 
-                pages.put(UUID.fromString(plainText.split(":")[1]), result);
+                pages.put(plainText.split(":")[1], result);
             }
 
             cursor = response.hasMore() ? response.nextCursor() : null;

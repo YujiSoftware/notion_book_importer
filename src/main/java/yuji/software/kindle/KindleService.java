@@ -14,12 +14,11 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Map;
-import java.util.UUID;
 
 @Service
 public class KindleService implements BookshelfService {
     private static final String STORE = "Kindle";
-    private static final String UUID_PREFIX = "KINDLE";
+    private static final String KEY_PREFIX = "KINDLE";
 
     @Value("${NOTION_API_KEY}")
     private String apiKey;
@@ -35,9 +34,9 @@ public class KindleService implements BookshelfService {
 
     private void process(Kindle kindle) throws IOException, InterruptedException {
         try (Notion notion = new Notion(apiKey, databaseId)) {
-            Map<UUID, PageObjectResponse> pages = notion.getPages(UUID_PREFIX);
+            Map<String, PageObjectResponse> pages = notion.getPages(KEY_PREFIX);
             for (KindleItem item : kindle.items()) {
-                PageObjectResponse page = pages.get(item.uuid());
+                PageObjectResponse page = pages.get(item.asin());
                 if (page != null) {
                     PageObjectResponse.Property.Select status = (PageObjectResponse.Property.Select) page.properties().get("ステータス");
                     PartialSelectResponse select = status.select();
@@ -52,13 +51,13 @@ public class KindleService implements BookshelfService {
                             .update(page.id());
                 } else {
                     notion.builder()
-                            .uuid(UUID_PREFIX, item.uuid())
                             .title(item.title())
                             .author(item.authors())
                             .buyTime(ZonedDateTime.ofInstant(Instant.ofEpochMilli(item.acquiredTime()), ZoneId.of("Asia/Tokyo")))
                             .status(item.readStatus().getText())
                             .store(STORE)
                             .url("https://read.amazon.co.jp/?asin=" + item.asin())
+                            .key(KEY_PREFIX, item.asin())
                             .create();
                 }
             }

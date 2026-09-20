@@ -11,12 +11,11 @@ import yuji.software.notion.PartialSelectResponse;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map;
-import java.util.UUID;
 
 @Service
 public class BookWalkerService implements BookshelfService {
     private static final String STORE = "BOOK☆WALKER";
-    private static final String UUID_PREFIX = "BOOKWALKER";
+    private static final String KEY_PREFIX = "BOOKWALKER";
 
     @Value("${NOTION_API_KEY}")
     private String apiKey;
@@ -32,9 +31,9 @@ public class BookWalkerService implements BookshelfService {
 
     public void process(BookWalker bookWalker) throws IOException, InterruptedException {
         try (Notion notion = new Notion(apiKey, databaseId)) {
-            Map<UUID, PageObjectResponse> pages = notion.getPages(UUID_PREFIX);
+            Map<String, PageObjectResponse> pages = notion.getPages(KEY_PREFIX);
             for (BookWalkerItem item : bookWalker.items()) {
-                PageObjectResponse page = pages.get(item.uuid());
+                PageObjectResponse page = pages.get(item.uuid().toString());
                 if (page != null) {
                     PageObjectResponse.Property.Select status = (PageObjectResponse.Property.Select) page.properties().get("ステータス");
                     PartialSelectResponse select = status.select();
@@ -50,13 +49,13 @@ public class BookWalkerService implements BookshelfService {
                 } else {
                     notion.builder()
                             .title(item.title())
-                            .uuid(UUID_PREFIX, item.uuid())
                             .author(String.join(",", item.authors()))
                             .category(item.category())
                             .buyTime(item.buyTime())
                             .status(item.status().name())
                             .store(STORE)
                             .url(item.url().toString())
+                            .key(KEY_PREFIX, item.uuid().toString())
                             .create();
                 }
             }
