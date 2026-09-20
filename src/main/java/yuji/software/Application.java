@@ -8,6 +8,8 @@ import org.springframework.context.ApplicationContext;
 public class Application {
     public static void main(String[] args) {
         ApplicationContext ctx = SpringApplication.run(Application.class, args);
-        System.exit(SpringApplication.exit(ctx));
+        if (args.length > 0) {
+            System.exit(SpringApplication.exit(ctx));
+        }
     }
 }

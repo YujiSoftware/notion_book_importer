@@ -4,46 +4,98 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Getting Started: Serving Web Content</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"
-          integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
-            integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js"
+            integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y"
             crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
           integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ=="
           crossorigin="anonymous" referrerpolicy="no-referrer"/>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 </head>
 <body>
-<div class="container my-2">
+<div id="app" class="container my-2">
     <h1>Notion Book Importer</h1>
-    <form action="/upload" method="post" enctype="multipart/form-data">
-        <div class="my-3">
-            <div class="form-check">
-                <input class="form-check-input" type="radio" name="type" value="kindle" id="kindle" checked>
-                <label class="form-check-label" for="kindle">
-                    Kindle
-                </label>
-                <a href="https://www.amazon.co.jp/hz/mycd/digital-console/contentlist/booksAll/dateDsc/"
-                   target="_blank">
-                    <i class="fas fa-external-link-alt"></i>
-                </a>
-            </div>
-            <div class="form-check">
-                <input class="form-check-input" type="radio" name="type" value="book-walker" id="book-walker">
-                <label class="form-check-label" for="book-walker">
-                    BOOK☆WALKER
-                </label>
-                <a href="https://bookwalker.jp/holdBooks/"
-                   target="_blank">
-                    <i class="fas fa-external-link-alt"></i>
-                </a>
-            </div>
+    <input type="button" class="btn btn-outline-primary" value="バーコードをスキャン">
+    <div class="d-flex flex-column gap-2 my-3">
+        <div v-for="row in rows" :key="row.id" class="d-flex flex-row align-items-center gap-2">
+            <input v-model="row.value"
+                   @input="onInput(row)"
+                   ref="rowInputs"
+                   type="text"
+                   class="form-control w-auto"
+                   :disabled="row.sending || !!row.success || !!row.error"
+                   :readonly="row.sending || !!row.success || !!row.error"
+                   name="isbn"
+                   inputmode="numeric"
+                   pattern="[0-9-]{13}"
+                   minlength="13"
+                   maxlength="17"
+                   autocomplete="off"
+                   placeholder="978…"
+                   autofocus>
+            <span v-if="row.sending" class="text-success"><img th:src="@{images/indicator.gif}"></span>
+            <span v-if="row.success" class="text-success">{{ row.success }}</span>
+            <span v-if="row.error" class="text-danger">{{ row.error }}</span>
         </div>
-        <div class="my-3">
-            <input class="form-control" type="file" name="file" id="file">
-        </div>
-        <input class="btn btn-primary" type="submit" value="アップロード">
-    </form>
+    </div>
 </div>
+
+<script>
+    const app = Vue.createApp({
+        data() {
+            return {
+                rows: [{id: 1, value: '', success: '', error: '', sending: false}],
+                nextId: 2,
+            };
+        },
+        methods: {
+            async onInput(row) {
+                const value = (row.value || '').replace(/[\D-]/g, '');
+                row.value = value.slice(0, 13);
+
+                if (row.value.length !== 13 || row.sending || row.success || row.error) {
+                    return;
+                }
+
+                row.sending = true;
+                this.rows.push({id: this.nextId++, value: '', success: '', error: '', sending: false});
+                this.$nextTick(() => {
+                    const inputs = this.$refs.rowInputs;
+                    inputs[inputs.length - 1]?.focus();
+                });
+
+                try {
+                    // 連続入力する場合がるので、すでに入力済みのISBNは登録しないようにする
+                    if (this.rows.filter(r => r.value === row.value).length > 1) {
+                        row.error = `ISBN ${row.value} はすでに入力済みです`;
+                        return;
+                    }
+
+                    const response = await fetch('/register', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({isbn: row.value}),
+                    });
+
+                    if (!response.ok) {
+                        row.error = (await response.json()).message || `ISBN ${row.value} の登録に失敗しました`;
+                        return;
+                    }
+
+                    const result = await response.json();
+                    row.success = result.message || `ISBN ${row.value} を登録しました`;
+                } catch (error) {
+                    row.error = error;
+                } finally {
+                    row.sending = false;
+                }
+            }
+        },
+    }).mount('#app');
+</script>
 </body>
 </html>

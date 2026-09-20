@@ -20,6 +20,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public class Notion implements Closeable {
     private static final Logger logger = LoggerFactory.getLogger(Notion.class);
@@ -195,7 +196,15 @@ public class Notion implements Closeable {
         }
     }
 
+    public Optional<PageObjectResponse> getPage(String key, String value) throws IOException, InterruptedException {
+        return getPages(key, value).values().stream().findFirst();
+    }
+
     public Map<String, PageObjectResponse> getPages(String key) throws IOException, InterruptedException {
+        return getPages(key, null);
+    }
+
+    private Map<String, PageObjectResponse> getPages(String key, String value) throws IOException, InterruptedException {
         ObjectMapper mapper = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
@@ -206,7 +215,11 @@ public class Notion implements Closeable {
             // TODO: オブジェクト化
             String json;
             if (cursor == null) {
-                json = "{\"filter\": { \"property\": \"Key\", \"rich_text\": { \"starts_with\": \"" + key + ":\" }}}";
+                if (value == null) {
+                    json = "{\"filter\": { \"property\": \"Key\", \"rich_text\": { \"starts_with\": \"" + key + ":\" }}}";
+                } else {
+                    json = "{\"filter\": { \"property\": \"Key\", \"rich_text\": { \"equals\": \"" + key + ":" + value + "\" }}}";
+                }
             } else {
                 json = "{\"start_cursor\": \"" + cursor + "\"}";
             }
