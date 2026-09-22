@@ -20,7 +20,7 @@
     <input type="button" class="btn btn-outline-primary" value="バーコードをスキャン">
     <div class="d-flex flex-column gap-2 my-3">
         <div v-for="row in rows" :key="row.id" class="d-flex flex-row align-items-center gap-2">
-            <input v-model="row.value"
+            <input v-model="row.isbn"
                    @input="onInput(row)"
                    ref="rowInputs"
                    type="text"
@@ -36,8 +36,55 @@
                    placeholder="978…"
                    autofocus>
             <span v-if="row.sending" class="text-success"><img th:src="@{images/indicator.gif}"></span>
-            <span v-if="row.success" class="text-success">{{ row.success }}</span>
-            <span v-if="row.error" class="text-danger">{{ row.error }}</span>
+            <span v-if="row.success" class="text-success">
+                <button type="button" class="btn btn-link p-0 text-success text-decoration-none"
+                        title="編集" @click="openEditModal(row)">📝</button>
+                {{ row.success }}
+            </span>
+            <span v-if="row.error" class="text-danger">
+                <button type="button" class="btn btn-link p-0 text-success text-decoration-none"
+                        title="編集" @click="openEditModal(row)">📝</button>
+                {{ row.error }}
+            </span>
+        </div>
+
+        <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h1 class="modal-title fs-5" id="exampleModalLabel">編集</h1>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form>
+                            <div class="mb-3">
+                                <label for="isbn" class="col-form-label">ISBN</label>
+                                <div class="input-group mb-3">
+                                    <input type="text" class="form-control" id="isbn"
+                                           v-model="editForm.isbn" disabled readonly>
+                                    <button class="btn btn-outline-secondary" type="button" id="search"
+                                            @click="searchISBN">
+                                        🔍
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="title" class="col-form-label">タイトル</label>
+                                <input type="text" class="form-control" id="title" v-model="editForm.title">
+                            </div>
+                            <div class="mb-3">
+                                <label for="author" class="col-form-label">著者</label>
+                                <input type="text" class="form-control" id="author" v-model="editForm.author">
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" :disabled="editSending" @click="saveEdit">OK
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -46,21 +93,81 @@
     const app = Vue.createApp({
         data() {
             return {
-                rows: [{id: 1, value: '', success: '', error: '', sending: false}],
+                rows: [{id: 1, isbn: '', title: '', author: '', success: '', error: '', sending: false}],
                 nextId: 2,
+                editingRow: null,
+                editForm: {isbn: '', title: '', author: ''},
             };
         },
         methods: {
-            async onInput(row) {
-                const value = (row.value || '').replace(/[\D-]/g, '');
-                row.value = value.slice(0, 13);
+            openEditModal(row) {
+                this.editingRow = row;
+                this.editForm = {
+                    isbn: row.isbn,
+                    title: row.title,
+                    author: row.author,
+                };
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('editModal')).show();
+            },
+            searchISBN() {
+                const url = `https://www.google.com/search?q=${encodeURIComponent(this.editForm.isbn)}`;
+                window.open(url, '_blank');
+            },
+            async saveEdit() {
+                if (!this.editingRow) {
+                    return;
+                }
 
-                if (row.value.length !== 13 || row.sending || row.success || row.error) {
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('editModal')).hide();
+                this.editingRow.success = '';
+                this.editingRow.error = '';
+                this.editingRow.sending = true;
+                try {
+                    const response = await fetch('/edit', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(this.editForm),
+                    });
+
+                    const result = await response.json();
+                    if (!response.ok) {
+                        this.editingRow.success = '';
+                        this.editingRow.error = result.message || `ISBN ${this.editForm.isbn} の更新に失敗しました`;
+                        return;
+                    }
+
+                    this.editingRow.title = result.title;
+                    this.editingRow.author = result.author;
+                    this.editingRow.success = result.message;
+                    this.editingRow.error = '';
+                } catch (error) {
+                    this.editingRow.success = '';
+                    this.editingRow.error = error.message || String(error);
+                } finally {
+                    this.editingRow.sending = false;
+                    this.editingRow = null;
+                }
+            },
+            async onInput(row) {
+                const isbn = (row.isbn || '').replace(/[\D-]/g, '');
+                row.isbn = isbn.slice(0, 13);
+
+                if (row.isbn.length !== 13 || row.sending || row.success || row.error) {
                     return;
                 }
 
                 row.sending = true;
-                this.rows.push({id: this.nextId++, value: '', success: '', error: '', sending: false});
+                this.rows.push({
+                    id: this.nextId++,
+                    isbn: '',
+                    title: '',
+                    author: '',
+                    success: '',
+                    error: '',
+                    sending: false
+                });
                 this.$nextTick(() => {
                     const inputs = this.$refs.rowInputs;
                     inputs[inputs.length - 1]?.focus();
@@ -68,8 +175,8 @@
 
                 try {
                     // 連続入力する場合がるので、すでに入力済みのISBNは登録しないようにする
-                    if (this.rows.filter(r => r.value === row.value).length > 1) {
-                        row.error = `ISBN ${row.value} はすでに入力済みです`;
+                    if (this.rows.filter(r => r.isbn === row.isbn).length > 1) {
+                        row.error = `ISBN ${row.isbn} はすでに入力済みです`;
                         return;
                     }
 
@@ -78,18 +185,20 @@
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({isbn: row.value}),
+                        body: JSON.stringify({isbn: row.isbn}),
                     });
 
                     if (!response.ok) {
-                        row.error = (await response.json()).message || `ISBN ${row.value} の登録に失敗しました`;
+                        row.error = (await response.json()).message || `ISBN ${row.isbn} の登録に失敗しました`;
                         return;
                     }
 
                     const result = await response.json();
-                    row.success = result.message || `ISBN ${row.value} を登録しました`;
+                    row.success = result.message || `ISBN ${row.isbn} を登録しました`;
+                    row.title = result.title;
+                    row.author = result.author;
                 } catch (error) {
-                    row.error = error;
+                    row.error = error.message || String(error);
                 } finally {
                     row.sending = false;
                 }

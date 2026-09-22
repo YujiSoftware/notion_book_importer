@@ -96,7 +96,38 @@ public class MainController {
                     .key(KEY_PREFIX, isbn.toString())
                     .create();
             return ResponseEntity.ok(Map.of(
-                    "message", book.title + " (" + book.author + ") を登録しました"
+                    "message", book.title + " (" + book.author + ") を登録しました",
+                    "isbn", isbn.toString(),
+                    "title", book.title,
+                    "author", book.author
+            ));
+        }
+    }
+
+    @PostMapping("/edit")
+    @ResponseBody
+    public ResponseEntity<Map<String, String>> edit(@RequestBody Map<String, String> payload) throws IOException, InterruptedException {
+        ISBN isbn = ISBN.of(payload.getOrDefault("isbn", ""));
+        if (isbn == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "ISBNが不正です。"));
+        }
+
+        try (Notion notion = new Notion(apiKey, databaseId)) {
+            Optional<PageObjectResponse> page = notion.getPage(KEY_PREFIX, isbn.toString());
+            if (page.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", isbn + " は登録されていません"));
+            }
+
+            notion.builder()
+                    .title(payload.get("title"))
+                    .author(payload.get("author"))
+                    .key(KEY_PREFIX, isbn.toString())
+                    .update(page.get().id());
+            return ResponseEntity.ok(Map.of(
+                    "message", payload.get("title") + " (" + payload.get("author") + ") を更新しました",
+                    "isbn", isbn.toString(),
+                    "title", payload.get("title"),
+                    "author", payload.get("author")
             ));
         }
     }
