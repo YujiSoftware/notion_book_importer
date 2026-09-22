@@ -67,7 +67,7 @@ public class MainController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "書籍情報が見つかりませんでした。"));
             }
         }
-        
+
         // Google Books API で取得した書籍情報に著者が含まれていない場合があるので、OpenBD で補完する
         if (book.author.isEmpty()) {
             var openBDBook = getFromOpenBD(isbn);
@@ -75,6 +75,10 @@ public class MainController {
                 book = new Book(book.title, openBDBook.author);
             }
         }
+
+        // 巻数を正規化
+        // 例: "銀の匙 (15)" → "銀の匙 15"
+        book = new Book(book.title, book.author.replaceFirst("\\s*\\(\\d+\\)", " $1"));
 
         try (Notion notion = new Notion(apiKey, databaseId)) {
             Optional<PageObjectResponse> page = notion.getPage(KEY_PREFIX, isbn.toString());
