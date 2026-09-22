@@ -76,9 +76,12 @@ public class MainController {
             }
         }
 
-        // 巻数を正規化
+        // 正規化
         // 例: "銀の匙 (15)" → "銀の匙 15"
-        book = new Book(book.title, book.author.replaceFirst("\\s*\\(\\d+\\)", " $1"));
+        book = new Book(
+                book.title.replace("!", "！").replace("?", "？"),
+                book.author.replaceFirst("\\s*\\(\\d+\\)", " $1")
+        );
 
         try (Notion notion = new Notion(apiKey, databaseId)) {
             Optional<PageObjectResponse> page = notion.getPage(KEY_PREFIX, isbn.toString());
