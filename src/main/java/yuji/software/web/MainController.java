@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 @Controller
 public class MainController {
     private static final String STORE = "紙書籍";
-    private static final String KEY_PREFIX = "PHYSICAL";
+    private static final String KEY_PREFIX = "ISBN";
 
     private final GoogleBooksAPI googleBooksAPI;
 
