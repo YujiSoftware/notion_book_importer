@@ -205,6 +205,10 @@
             }
         },
     }).mount('#app');
+
+    window.addEventListener('beforeunload', (event) => {
+        event.preventDefault();
+    });
 </script>
 </body>
 </html>
