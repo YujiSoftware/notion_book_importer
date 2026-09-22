@@ -214,14 +214,11 @@ public class Notion implements Closeable {
         do {
             // TODO: オブジェクト化
             String json;
-            if (cursor == null) {
-                if (value == null) {
-                    json = "{\"filter\": { \"property\": \"Key\", \"rich_text\": { \"starts_with\": \"" + key + ":\" }}}";
-                } else {
-                    json = "{\"filter\": { \"property\": \"Key\", \"rich_text\": { \"equals\": \"" + key + ":" + value + "\" }}}";
-                }
+            String startCursor = cursor == null ? "" : ", \"start_cursor\": \"" + cursor + "\"";
+            if (value == null) {
+                json = "{\"filter\": { \"property\": \"Key\", \"rich_text\": { \"starts_with\": \"" + key + ":\" }}" + startCursor + "}";
             } else {
-                json = "{\"start_cursor\": \"" + cursor + "\"}";
+                json = "{\"filter\": { \"property\": \"Key\", \"rich_text\": { \"equals\": \"" + key + ":" + value + "\" }}" + startCursor + "}";
             }
 
             var req = HttpRequest.newBuilder()
