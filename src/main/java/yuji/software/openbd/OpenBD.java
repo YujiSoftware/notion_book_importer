@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import yuji.software.model.ISBN;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
@@ -24,7 +25,7 @@ public class OpenBD implements AutoCloseable {
         client.close();
     }
 
-    public OpenBDBook get(String isbn) throws IOException, InterruptedException {
+    public OpenBDBook get(ISBN isbn) throws IOException, InterruptedException {
         var req = HttpRequest.newBuilder()
                 .uri(URI.create("https://api.openbd.jp/v1/get?isbn=" + isbn))
                 .GET()

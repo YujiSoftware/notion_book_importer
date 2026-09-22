@@ -9,11 +9,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 import yuji.software.Notion;
+import yuji.software.google.GoogleBooksAPI;
+import yuji.software.model.ISBN;
 import yuji.software.notion.PageObjectResponse;
 import yuji.software.openbd.OpenBD;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -23,6 +26,8 @@ import java.util.stream.Collectors;
 public class MainController {
     private static final String STORE = "紙書籍";
     private static final String KEY_PREFIX = "PHYSICAL";
+
+    private final GoogleBooksAPI googleBooksAPI;
 
     @Value("${NOTION_API_KEY}")
     private String apiKey;
@@ -35,7 +40,11 @@ public class MainController {
      */
     private static final Pattern PERSON_DATE = Pattern.compile("\\d{4}-.*");
 
-    public MainController() {
+    private record Book(String title, String author) {
+    }
+
+    public MainController(GoogleBooksAPI googleBooksAPI) {
+        this.googleBooksAPI = googleBooksAPI;
     }
 
     @GetMapping("/")
@@ -46,15 +55,68 @@ public class MainController {
     @PostMapping("/register")
     @ResponseBody
     public ResponseEntity<Map<String, String>> register(@RequestBody Map<String, String> payload) throws IOException, InterruptedException {
-        String isbn = payload.getOrDefault("isbn", "");
-        if (!isbn.matches("\\d{10}|\\d{13}") || !isbn.startsWith("978")) {
+        ISBN isbn = ISBN.of(payload.getOrDefault("isbn", ""));
+        if (isbn == null) {
             return ResponseEntity.badRequest().body(Map.of("message", "ISBNが不正です。"));
         }
 
+        var book = getFromGoogleBooks(isbn);
+        if (book == null) {
+            book = getFromOpenBD(isbn);
+            if (book == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "書籍情報が見つかりませんでした。"));
+            }
+        }
+        
+        // Google Books API で取得した書籍情報に著者が含まれていない場合があるので、OpenBD で補完する
+        if (book.author.isEmpty()) {
+            var openBDBook = getFromOpenBD(isbn);
+            if (openBDBook != null) {
+                book = new Book(book.title, openBDBook.author);
+            }
+        }
+
+        try (Notion notion = new Notion(apiKey, databaseId)) {
+            Optional<PageObjectResponse> page = notion.getPage(KEY_PREFIX, isbn.toString());
+            if (page.isPresent()) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                        "message", book.title + " (" + book.author + ") は登録済みです"
+                ));
+            }
+
+            notion.builder()
+                    .title(book.title)
+                    .author(book.author)
+                    .status("未読")
+                    .store(STORE)
+                    .key(KEY_PREFIX, isbn.toString())
+                    .create();
+            return ResponseEntity.ok(Map.of(
+                    "message", book.title + " (" + book.author + ") を登録しました"
+            ));
+        }
+    }
+
+    private Book getFromGoogleBooks(ISBN isbn) throws IOException, InterruptedException {
+        var item = googleBooksAPI.get(isbn);
+        if (item == null) {
+            return null;
+        }
+
+        var title = item.volumeInfo().title();
+
+        // 著者が null の場合がある（未登録？）
+        var authors = Optional.ofNullable(item.volumeInfo().authors()).orElse(List.of());
+        var author = String.join(", ", authors);
+
+        return new Book(title, author);
+    }
+
+    private Book getFromOpenBD(ISBN isbn) throws IOException, InterruptedException {
         try (OpenBD openBD = new OpenBD()) {
             var book = openBD.get(isbn);
             if (book == null) {
-                return ResponseEntity.badRequest().body(Map.of("message", "見つかりませんでした。"));
+                return null;
             }
 
             String title = book.onix().descriptiveDetail().titleDetail().titleElement().titleText().content();
@@ -69,25 +131,7 @@ public class MainController {
                     .reduce((a, b) -> a + ", " + b)
                     .orElse("");
 
-            try (Notion notion = new Notion(apiKey, databaseId)) {
-                Optional<PageObjectResponse> page = notion.getPage(KEY_PREFIX, isbn);
-                if (page.isPresent()) {
-                    return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
-                            "message", title + " (" + author + ") は登録済みです"
-                    ));
-                }
-
-                notion.builder()
-                        .title(title)
-                        .author(author)
-                        .status("未読")
-                        .store(STORE)
-                        .key(KEY_PREFIX, isbn)
-                        .create();
-                return ResponseEntity.ok(Map.of(
-                        "message", title + " (" + author + ") を登録しました"
-                ));
-            }
+            return new Book(title, author);
         }
     }
 }
