@@ -151,7 +151,10 @@
                 }
             },
             async onInput(row) {
-                const isbn = (row.isbn || '').replace(/[\D-]/g, '');
+                const isbn = (row.isbn || '').replace(/[０-９]/g, (s) => {
+                    // 全角数字から半角数字に正規化
+                    return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+                }).replace(/[\D-]/g, '');
                 row.isbn = isbn.slice(0, 13);
 
                 if (row.isbn.length !== 13 || row.sending || row.success || row.error) {
