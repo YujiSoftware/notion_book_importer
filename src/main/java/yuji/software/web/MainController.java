@@ -40,7 +40,13 @@ public class MainController {
      */
     private static final Pattern PERSON_DATE = Pattern.compile("\\d{4}-.*");
 
-    private record Book(String title, String author) {
+    record Book(String title, String author) {
+        Book(String title, String author) {
+            // 正規化
+            // 例: "銀の匙 (15)" → "銀の匙 15"
+            this.title = title.replace("!", "！").replace("?", "？").replaceFirst("\\s*\\((\\d+)\\)", " $1");
+            this.author = author;
+        }
     }
 
     public MainController(GoogleBooksAPI googleBooksAPI) {
@@ -75,13 +81,6 @@ public class MainController {
                 book = new Book(book.title, openBDBook.author);
             }
         }
-
-        // 正規化
-        // 例: "銀の匙 (15)" → "銀の匙 15"
-        book = new Book(
-                book.title.replace("!", "！").replace("?", "？"),
-                book.author.replaceFirst("\\s*\\(\\d+\\)", " $1")
-        );
 
         try (Notion notion = new Notion(apiKey, databaseId)) {
             Optional<PageObjectResponse> page = notion.getPage(KEY_PREFIX, isbn.toString());
